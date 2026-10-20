@@ -1,9 +1,31 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 import "./App.css";
 
 const API = "http://localhost:5000/api/transactions";
+
+const COLORS = [
+  "#6366f1",
+  "#f59e0b",
+  "#10b981",
+  "#ec4899",
+  "#8b5cf6",
+  "#06b6d4",
+];
 
 function App() {
   const [transactions, setTransactions] = useState([]);
@@ -33,18 +55,40 @@ function App() {
 
   const income = transactions
     .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const expenses = transactions
     .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const balance = income - expenses;
 
+  // Data for the income vs expenses chart
+  const comparisonData = [
+    { name: "Money", Income: income, Expenses: expenses },
+  ];
+
+  // Group expenses by category for the pie chart
+  const categoryData = Object.values(
+    transactions
+      .filter((t) => t.type === "expense")
+      .reduce((groups, t) => {
+        const categoryName = t.category || "Other";
+
+        if (!groups[categoryName]) {
+          groups[categoryName] = {
+            name: categoryName,
+            value: 0,
+          };
+        }
+
+        groups[categoryName].value += Number(t.amount);
+        return groups;
+      }, {})
+  );
+
   async function addTransaction(e) {
     e.preventDefault();
-    console.log("Amount entered:", amount);
-    console.log("Amount sent:", Number(amount));
 
     try {
       await axios.post(API, {
@@ -93,6 +137,74 @@ function App() {
         <div className="card">
           <h3>Total Expenses</h3>
           <h2 className="expense">₹{expenses.toFixed(2)}</h2>
+        </div>
+      </section>
+
+      {/* Charts */}
+      <section className="charts-section">
+        <h2>Spending Insights</h2>
+
+        <div className="charts-grid">
+          <div className="chart-card">
+            <h3>Income vs. Expenses</h3>
+
+            {transactions.length === 0 ? (
+              <p>Add transactions to see your chart.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={comparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value) =>
+                      `₹${Number(value).toFixed(2)}`
+                    }
+                  />
+                  <Legend />
+                  <Bar dataKey="Income" fill="#10b981" />
+                  <Bar dataKey="Expenses" fill="#ef4444" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          <div className="chart-card">
+            <h3>Expenses by Category</h3>
+
+            {categoryData.length === 0 ? (
+              <p>Add an expense to see category breakdown.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={categoryData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={85}
+                    label={({ name, percent }) =>
+                      `${name} ${(percent * 100).toFixed(0)}%`
+                    }
+                  >
+                    {categoryData.map((entry, index) => (
+                      <Cell
+                        key={entry.name}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value) =>
+                      `₹${Number(value).toFixed(2)}`
+                    }
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
       </section>
 
@@ -157,8 +269,10 @@ function App() {
 
               <div className="transaction-actions">
                 <strong className={t.type === "income" ? "income" : "expense"}>
-                  {t.type === "income" ? "+" : "-"}₹{t.amount.toFixed(2)}
+                  {t.type === "income" ? "+" : "-"}₹
+                  {Number(t.amount).toFixed(2)}
                 </strong>
+
                 <button
                   type="button"
                   className="delete-button"
